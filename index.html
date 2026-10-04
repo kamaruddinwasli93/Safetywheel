@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ESH Safety Wheel</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(10px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes spin-slow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .text-gradient {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Custom Scrollbar for better PC/Mac experience */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.8);
+        }
+        
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen overflow-hidden flex flex-col">
+    <div id="root" class="h-full flex flex-col w-full"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const CATEGORIES = [
+            { id: 'etd', name: 'JK Bencana (ETD)', color: '#ef4444', icon: 'fa-truck-medical' },
+            { id: 'makanan', name: 'JK Keselamatan Makanan', color: '#f59e0b', icon: 'fa-utensils' },
+            { id: 'sinaran', name: 'JK Keselamatan Sinaran', color: '#eab308', icon: 'fa-radiation' },
+            { id: 'kimia', name: 'JK Keselamatan Kimia', color: '#10b981', icon: 'fa-flask' },
+            { id: 'infeksi', name: 'JK Kawalan Infeksi', color: '#06b6d4', icon: 'fa-virus-covid' },
+            { id: 'kebakaran', name: 'JK Keselamatan Kebakaran', color: '#f97316', icon: 'fa-fire' },
+            { id: 'perlindungan', name: 'JK Keselamatan Perlindungan', color: '#3b82f6', icon: 'fa-shield-halved' },
+            { id: 'laser', name: 'JK Keselamatan Laser', color: '#9333ea', icon: 'fa-eye' }
+        ];
+
+        const INITIAL_QUESTIONS = [
+            // 🚨 JK BENCANA (ETD)
+            { id: 'ETD-1', category: 'etd', question: 'Apakah tindakan paling utama apabila berlaku kecemasan atau bencana di hospital?', options: ['Panik dan meninggalkan tempat kejadian', 'Ikut prosedur kecemasan dan arahan pegawai bertanggungjawab', 'Menunggu arahan daripada rakan sekerja', 'Merakam kejadian untuk laporan'], correctAnswer: 1, explanation: 'Prosedur sedia ada direka khusus untuk memastikan keselamatan pesakit dan staf secara teratur dan pantas.', isActive: true },
+            { id: 'ETD-2', category: 'etd', question: 'Semasa berlaku kebakaran di kawasan ETD, apakah tindakan yang paling sesuai?', options: ['Menggunakan lif untuk keluar dengan cepat', 'Menyembunyikan diri di dalam bilik', 'Mengaktifkan sistem amaran dan mengikuti laluan evakuasi', 'Mengambil barang peribadi terlebih dahulu'], correctAnswer: 2, explanation: 'Mengaktifkan penggera memastikan semua pihak sedar, membolehkan proses evakuasi bermula dengan selamat mengikut laluan.', isActive: true },
+            { id: 'ETD-3', category: 'etd', question: 'Apabila berlaku situasi bencana yang memerlukan pemindahan pesakit, apakah keutamaan utama?', options: ['Memindahkan pesakit mengikut keutamaan risiko dan arahan pelan bencana', 'Memindahkan pesakit yang paling dekat dengan pintu dahulu tanpa penilaian', 'Memastikan semua barang pesakit dibawa keluar', 'Menunggu sehingga keadaan benar-benar selamat tanpa mengambil tindakan'], correctAnswer: 0, explanation: 'Penilaian keutamaan (triage) memastikan nyawa pesakit berisiko tinggi diselamatkan dahulu mengikut pelan bencana hospital.', isActive: true },
+
+            // 🍽 JK KESELAMATAN MAKANAN
+            { id: 'MAK-1', category: 'makanan', question: 'Apakah amalan paling penting sebelum mengendalikan makanan?', options: ['Memakai minyak wangi', 'Mencuci tangan dengan betul', 'Menggunakan sarung tangan sahaja', 'Memastikan makanan kelihatan cantik'], correctAnswer: 1, explanation: 'Mencuci tangan dengan betul membuang patogen dan kotoran fizikal untuk mencegah kejadian keracunan makanan.', isActive: true },
+            { id: 'MAK-2', category: 'makanan', question: 'Mengapakah makanan mentah perlu diasingkan daripada makanan yang telah dimasak?', options: ['Untuk menjimatkan ruang', 'Untuk mengelakkan pencemaran silang', 'Supaya makanan lebih cepat sejuk', 'Untuk memudahkan penyimpanan'], correctAnswer: 1, explanation: 'Pengasingan (cross-contamination prevention) menghalang bakteria daripada makanan mentah berpindah ke makanan yang siap dimasak.', isActive: true },
+            { id: 'MAK-3', category: 'makanan', question: 'Apakah tindakan paling sesuai jika makanan yang disediakan disyaki telah tercemar?', options: ['Panaskan semula dan terus hidangkan', 'Tambah bahan lain untuk menutup bau', 'Asingkan makanan tersebut dan laporkan kepada pihak bertanggungjawab', 'Hidangkan kepada staf terlebih dahulu'], correctAnswer: 2, explanation: 'Makanan disyaki tercemar perlu diasingkan segera untuk keselamatan, pemantauan dan siasatan punca.', isActive: true },
+
+            // ☢️ JK KESELAMATAN SINARAN
+            { id: 'SIN-1', category: 'sinaran', question: 'Apakah tiga prinsip asas perlindungan daripada sinaran?', options: ['Speed, Safety, Strength', 'Time, Distance, Shielding', 'Stop, Drop, Roll', 'Check, Clean, Cover'], correctAnswer: 1, explanation: 'Masa (Time), Jarak (Distance), dan Hadangan (Shielding) merupakan standard asas keselamatan radiasi seluruh dunia.', isActive: true },
+            { id: 'SIN-2', category: 'sinaran', question: 'Jika seseorang perlu berada berhampiran sumber sinaran, apakah tindakan yang boleh mengurangkan dos pendedahan?', options: ['Berada lebih lama berhampiran sumber', 'Mengurangkan jarak daripada sumber', 'Mengurangkan masa pendedahan dan meningkatkan jarak', 'Tidak memakai sebarang perlindungan'], correctAnswer: 2, explanation: 'Semakin jauh jarak anda dan semakin singkat tempoh pendedahan, semakin kurang dos radiasi yang diserap.', isActive: true },
+            { id: 'SIN-3', category: 'sinaran', question: 'Apakah tujuan penggunaan apron plumbum semasa prosedur sinaran tertentu?', options: ['Mengurangkan risiko jatuh', 'Melindungi badan daripada pendedahan sinaran mengion', 'Mengelakkan pencemaran makanan', 'Mengurangkan bunyi mesin'], correctAnswer: 1, explanation: 'Apron plumbum mempunyai ketumpatan tinggi yang bertindak sebagai hadangan (shield) dari sinaran mengion berbahaya.', isActive: true },
+
+            // 🧪 JK KESELAMATAN KIMIA
+            { id: 'KIM-1', category: 'kimia', question: 'Apakah perkara pertama yang perlu dilakukan sebelum menggunakan bahan kimia?', options: ['Terus membuka bekas', 'Membaca label dan maklumat keselamatan bahan', 'Menghidu bahan untuk mengenal pasti', 'Mencampurkan dengan air'], correctAnswer: 1, explanation: 'Label dan SDS mengandungi maklumat kritikal berkaitan bahaya dan cara pengendalian selamat sesuatu bahan.', isActive: true },
+            { id: 'KIM-2', category: 'kimia', question: 'Apakah dokumen yang memberikan maklumat mengenai bahaya, pengendalian dan tindakan kecemasan bagi bahan kimia?', options: ['Attendance Sheet', 'Safety Data Sheet (SDS)', 'Patient Registration Form', 'Stock Card'], correctAnswer: 1, explanation: 'Safety Data Sheet (SDS) adalah dokumen rasmi yang menyenaraikan protokol lengkap bagi pengendalian bahan kimia.', isActive: true },
+            { id: 'KIM-3', category: 'kimia', question: 'Jika berlaku tumpahan bahan kimia yang tidak diketahui jenisnya, apakah tindakan paling selamat?', options: ['Sentuh untuk mengenal pasti bahan', 'Bersihkan dengan tangan kosong', 'Kawal kawasan, elakkan pendedahan dan laporkan mengikut prosedur', 'Campurkan dengan bahan kimia lain'], correctAnswer: 2, explanation: 'Kawasan tumpahan perlu dikepung bagi mengelakkan kemalangan lain sebelum pihak terlatih (seperti Hazmat) tiba.', isActive: true },
+
+            // 🦠 JK KAWALAN INFEKSI
+            { id: 'INF-1', category: 'infeksi', question: 'Apakah tindakan paling asas dan penting untuk mencegah penyebaran jangkitan?', options: ['Memakai dua pasang kasut', 'Hand hygiene', 'Membuka semua tingkap', 'Menggunakan perfume'], correctAnswer: 1, explanation: 'Hand hygiene adalah kaedah paling mudah dan berkesan untuk memutuskan rantaian transmisi jangkitan.', isActive: true },
+            { id: 'INF-2', category: 'infeksi', question: 'Bilakah hand hygiene perlu dilakukan?', options: ['Hanya selepas waktu bekerja', 'Hanya apabila tangan kelihatan kotor', 'Pada masa ditetapkan mengikut prinsip 5 Moments for Hand Hygiene', 'Sekali sahaja pada awal syif'], correctAnswer: 2, explanation: 'Setiap anggota kesihatan wajib mengamalkan 5 Moments of Hand Hygiene saranan WHO untuk perlindungan optimum.', isActive: true },
+            { id: 'INF-3', category: 'infeksi', question: 'Apakah tujuan penggunaan PPE dalam kawalan jangkitan?', options: ['Untuk menggantikan hand hygiene', 'Untuk melindungi petugas dan pesakit daripada risiko pendedahan', 'Untuk kelihatan lebih profesional', 'Untuk mengelakkan pakaian kotor sahaja'], correctAnswer: 1, explanation: 'PPE menjadi perisai fizikal terhadap darah, cecair badan, titisan udara (droplets) serta sentuhan patogen.', isActive: true },
+
+            // 🔥 JK KESELAMATAN KEBAKARAN
+            { id: 'KEB-1', category: 'kebakaran', question: 'Apakah tindakan yang betul apabila anda ternampak kebakaran?', options: ['Abaikan jika api kecil', 'Aktifkan penggera dan laporkan kejadian', 'Ambil gambar dahulu', 'Tunggu sehingga api menjadi besar'], correctAnswer: 1, explanation: 'Bunyikan penggera terlebih dahulu supaya tindakan kecemasan hospital dan bantuan segera dapat diaktifkan.', isActive: true },
+            { id: 'KEB-2', category: 'kebakaran', question: 'Apakah maksud PASS ketika menggunakan alat pemadam api?', options: ['Pull, Aim, Squeeze, Sweep', 'Push, Alert, Stop, Save', 'Pull, Alert, Stop, Spray', 'Protect, Aim, Stop, Sweep'], correctAnswer: 0, explanation: 'Cabut pin (Pull), Hala ke pangkal api (Aim), Tekan tuil (Squeeze), dan Sapu ke kiri-kanan (Sweep).', isActive: true },
+            { id: 'KEB-3', category: 'kebakaran', question: 'Apakah yang perlu dielakkan semasa evakuasi kebakaran di hospital?', options: ['Mengikuti laluan kecemasan', 'Membantu pesakit mengikut arahan', 'Menggunakan lif', 'Berkumpul di designated assembly point'], correctAnswer: 2, explanation: 'Lif amat berbahaya kerana boleh tersangkut sekiranya bekalan elektrik terputus atau aci lif dipenuhi asap.', isActive: true },
+
+            // 🛡 JK KESELAMATAN PERLINDUNGAN
+            { id: 'PER-1', category: 'perlindungan', question: 'Apakah tindakan yang sesuai jika anda melihat individu yang tidak dikenali berada di kawasan larangan?', options: ['Biarkan sahaja', 'Tanya secara profesional atau laporkan kepada pihak keselamatan', 'Benarkan masuk jika kelihatan yakin', 'Berikan akses kad sendiri'], correctAnswer: 1, explanation: 'Menegur dan melaporkan (tailgating/trespassing) memastikan pesakit dan staf sentiasa terpelihara dari anasir luar.', isActive: true },
+            { id: 'PER-2', category: 'perlindungan', question: 'Apakah tindakan yang betul terhadap kad akses atau ID staf?', options: ['Pinjamkan kepada rakan', 'Kongsi PIN dengan rakan', 'Simpan dan gunakan untuk diri sendiri sahaja', 'Letakkan di tempat awam'], correctAnswer: 2, explanation: 'Kad akses merekod data individu secara khusus. Berkongsi kad menyebabkan pelanggaran keselamatan sistem kawalan.', isActive: true },
+            { id: 'PER-3', category: 'perlindungan', question: 'Jika anda menerima ancaman atau melihat tingkah laku mencurigakan di hospital, apakah tindakan terbaik?', options: ['Berhadapan dengan individu tersebut seorang diri', 'Abaikan', 'Pastikan keselamatan diri dan laporkan melalui saluran yang ditetapkan', 'Sebarkan maklumat di media sosial'], correctAnswer: 2, explanation: 'Keselamatan nyawa diutamakan. Mengikut protokol kecemasan melindungi kawasan hospital daripada provokasi lanjut.', isActive: true },
+
+            // 💜 JK KESELAMATAN LASER
+            { id: 'LAS-1', category: 'laser', question: 'Apakah risiko utama yang perlu diberi perhatian apabila bekerja dengan laser?', options: ['Kerosakan mata', 'Dehidrasi', 'Kehilangan pendengaran', 'Keracunan makanan'], correctAnswer: 0, explanation: 'Mata manusia amat sensitif terhadap penyerapan pancaran laser (radiasi optikal), yang boleh menyebabkan kebutaan.', isActive: true },
+            { id: 'LAS-2', category: 'laser', question: 'Apakah tindakan yang betul apabila menggunakan peralatan laser?', options: ['Melihat terus ke arah pancaran laser', 'Menggunakan perlindungan mata yang sesuai mengikut jenis laser', 'Menghalakan laser kepada orang lain', 'Menggunakan laser tanpa latihan'], correctAnswer: 1, explanation: 'Cermin mata (goggles) keselamatan direka dengan lapisan khusus untuk menyerap panjang gelombang (wavelength) laser tersebut.', isActive: true },
+            { id: 'LAS-3', category: 'laser', question: 'Apakah yang perlu dilakukan jika terdapat risiko pancaran laser terkena kawasan sekeliling?', options: ['Teruskan kerana laser tidak berbahaya', 'Pastikan kawasan dikawal dan elakkan pendedahan kepada individu yang tidak berkaitan', 'Minta orang melihat pancaran tersebut', 'Tutup lampu bilik sahaja'], correctAnswer: 1, explanation: 'Prosedur laser mesti dijalankan di ruang terkawal dengan papan tanda amaran aktif bagi mengelak kemasukan staf lain.', isActive: true }
+        ];
+
+        const useDatabase = () => {
+            const [db, setDb] = useState(() => {
+                const stored = localStorage.getItem('esh_question_db_v5');
+                if (stored) return JSON.parse(stored);
+                localStorage.setItem('esh_question_db_v5', JSON.stringify(INITIAL_QUESTIONS));
+                return INITIAL_QUESTIONS;
+            });
+
+            // Mendapatkan mana-mana soalan dari kategori yang belum dijawab
+            const getQuestion = (categoryId, excludeIds = []) => {
+                const available = db.filter(q => q.isActive && q.category === categoryId && !excludeIds.includes(q.id));
+                if (available.length === 0) return null;
+                return available[Math.floor(Math.random() * available.length)];
+            };
+
+            return { db, getQuestion };
+        };
+
+        const Wheel = ({ onSpinComplete, categories }) => {
+            const [isSpinning, setIsSpinning] = useState(false);
+            const rotationRef = useRef(0);
+            const wheelRef = useRef(null);
+
+            const startSpin = () => {
+                if (isSpinning) return;
+                setIsSpinning(true);
+
+                const sliceAngle = 360 / categories.length;
+                
+                // 1. Pilih kategori pemenang secara rawak (0 hingga 7)
+                const winningIndex = Math.floor(Math.random() * categories.length);
+                
+                // 2. Pilih darjah yang selamat di dalam kepingan tersebut (elak terkena garisan sempadan)
+                const safeOffset = (sliceAngle * 0.15) + (Math.random() * (sliceAngle * 0.7));
+                const targetAngleOnWheel = (winningIndex * sliceAngle) + safeOffset;
+                
+                // 3. Kira putaran sebenar yang diperlukan supaya targetAngleOnWheel berada tepat di bawah penunjuk
+                const requiredRotation = 360 - targetAngleOnWheel;
+                
+                // 4. Hitung berapa banyak darjah tambahan dari putaran semasa
+                const extraSpins = Math.floor(Math.random() * 4) + 5; // 5 ke 8 putaran penuh
+                const currentMod = rotationRef.current % 360;
+                
+                let addRotation = requiredRotation - currentMod;
+                if (addRotation <= 0) addRotation += 360;
+
+                // 5. Kemas kini ref putaran dengan putaran tambahan
+                rotationRef.current += (extraSpins * 360) + addRotation;
+
+                if (wheelRef.current) {
+                    wheelRef.current.style.transition = 'transform 4s cubic-bezier(0.1, 0.9, 0.2, 1)';
+                    wheelRef.current.style.transform = `rotate(${rotationRef.current}deg)`;
+                }
+
+                setTimeout(() => {
+                    setIsSpinning(false);
+                    onSpinComplete(categories[winningIndex]);
+                }, 4000);
+            };
+
+            const sliceAngle = 360 / categories.length;
+
+            return (
+                <div className="relative w-72 h-72 sm:w-96 sm:h-96 mx-auto mb-8 drop-shadow-2xl flex-shrink-0">
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-12 bg-gradient-to-b from-slate-900 to-slate-700 z-20 flex items-center justify-center rounded-lg shadow-xl border-2 border-white/20">
+                        <div className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[16px] border-t-white absolute -bottom-3"></div>
+                        <i className="fa-solid fa-chevron-down text-white text-lg absolute -bottom-1"></i>
+                    </div>
+                    
+                    <div className="w-full h-full rounded-full border-8 border-white/40 shadow-[0_0_40px_rgba(0,0,0,0.15)] relative overflow-hidden bg-slate-800 backdrop-blur-sm"
+                         ref={wheelRef}
+                         style={{ transform: `rotate(${rotationRef.current}deg)` }}>
+                        
+                        {/* More accurate CSS conic background for slices */}
+                        <div className="absolute inset-0 rounded-full" style={{
+                            background: `conic-gradient(
+                                ${categories[0].color} 0deg 45deg,
+                                ${categories[1].color} 45deg 90deg,
+                                ${categories[2].color} 90deg 135deg,
+                                ${categories[3].color} 135deg 180deg,
+                                ${categories[4].color} 180deg 225deg,
+                                ${categories[5].color} 225deg 270deg,
+                                ${categories[6].color} 270deg 315deg,
+                                ${categories[7].color} 315deg 360deg
+                            )`
+                        }}></div>
+                        
+                        {}
+                        {categories.map((cat, i) => {
+                            const iconRotation = (i * sliceAngle) + (sliceAngle / 2);
+                            return (
+                                <div key={cat.id} className="absolute inset-0 flex justify-center w-full h-full" style={{ transform: `rotate(${iconRotation}deg)`}}>
+                                    <div className="pt-6 sm:pt-10 flex flex-col items-center">
+                                        <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/30 text-white transform -rotate-0">
+                                            <i className={`fa-solid ${cat.icon} text-xl sm:text-2xl drop-shadow-md`}></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-white to-slate-200 rounded-full z-10 shadow-[0_0_20px_rgba(0,0,0,0.3)] border-4 border-slate-800 flex items-center justify-center">
+                            <i className="fa-solid fa-dharmachakra text-slate-800 text-2xl sm:text-3xl animate-[spin-slow_10s_linear_infinite]"></i>
+                        </div>
+                    </div>
+                    
+                    {!isSpinning && (
+                        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-full text-center">
+                            <button 
+                                onClick={startSpin}
+                                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-lg font-bold shadow-lg hover:scale-105 active:scale-95 transition-all border-b-4 border-indigo-800">
+                                PUTAR SEKARANG
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const QuestionView = ({ question, onComplete, category, roundNum }) => {
+            const [selected, setSelected] = useState(null);
+            const [showResult, setShowResult] = useState(false);
+
+            const handleSelect = (index) => {
+                if (showResult) return;
+                setSelected(index);
+                setShowResult(true);
+            };
+
+            const isCorrect = selected === question.correctAnswer;
+
+            return (
+                <div className="w-full max-w-4xl mx-auto flex flex-col bg-white/90 backdrop-blur-xl rounded-3xl overflow-hidden shadow-2xl border border-white/50 animate-[float_0.3s_ease-out_forwards] my-auto shrink-0 max-h-[85vh]">
+                    <div className="p-6 md:p-8 text-white text-center relative overflow-hidden shrink-0 shadow-md" style={{ backgroundColor: category.color }}>
+                        <div className="absolute inset-0 bg-black/15 mix-blend-overlay"></div>
+                        <h3 className="text-sm font-bold uppercase tracking-widest opacity-90 mb-2 relative z-10">PUSINGAN {roundNum}/5</h3>
+                        <h2 className="text-xl md:text-3xl font-black mb-3 relative z-10 drop-shadow-md">
+                            <i className={`fa-solid ${category.icon} mr-3`}></i>{category.name}
+                        </h2>
+                        <div className="text-lg md:text-2xl font-medium px-4 md:px-8 relative z-10 leading-snug drop-shadow-sm text-white/95 break-words">
+                            "{question.question}"
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 p-6 md:p-8 flex flex-col overflow-y-auto custom-scrollbar bg-slate-50/50">
+                        {!showResult ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full my-auto">
+                                {question.options.map((opt, i) => (
+                                    <button 
+                                        key={i}
+                                        onClick={() => handleSelect(i)}
+                                        className="p-5 md:p-6 text-left rounded-2xl border-2 border-slate-200 hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg transition-all duration-200 group relative overflow-hidden bg-white flex items-center h-full min-h-[100px]"
+                                    >
+                                        <span className="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-blue-500 group-hover:text-white flex items-center justify-center font-bold mr-4 shrink-0 transition-colors text-slate-600">
+                                            {String.fromCharCode(65 + i)}
+                                        </span>
+                                        <span className="font-medium text-slate-700 text-sm md:text-base leading-relaxed break-words">{opt}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-4 animate-[float_0.3s_ease-out_forwards]">
+                                <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center mb-6 shadow-2xl shrink-0 ${isCorrect ? 'bg-gradient-to-br from-green-400 to-emerald-600' : 'bg-gradient-to-br from-red-400 to-rose-600'}`}>
+                                    <i className={`fa-solid ${isCorrect ? 'fa-check' : 'fa-xmark'} text-5xl md:text-6xl text-white drop-shadow-md`}></i>
+                                </div>
+                                <h2 className={`text-3xl md:text-4xl font-black mb-4 tracking-tight ${isCorrect ? 'text-emerald-600 text-gradient from-green-600 to-emerald-800' : 'text-rose-600 text-gradient from-red-600 to-rose-800'}`}>
+                                    {isCorrect ? 'TEPAT SEKALI!' : 'KURANG TEPAT'}
+                                </h2>
+                                
+                                {!isCorrect && (
+                                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-6 w-full max-w-2xl shrink-0">
+                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Jawapan Sebenar:</p>
+                                        <p className="font-semibold text-slate-800 md:text-lg break-words">{question.options[question.correctAnswer]}</p>
+                                    </div>
+                                )}
+                                
+                                <div className="bg-blue-50/80 p-5 rounded-2xl border border-blue-100 max-w-2xl w-full shrink-0">
+                                    <p className="text-slate-700 md:text-lg leading-relaxed break-words"><i className="fa-solid fa-lightbulb text-amber-500 mr-2"></i> {question.explanation}</p>
+                                </div>
+
+                                <button 
+                                    onClick={() => onComplete(isCorrect)}
+                                    className="mt-8 px-10 py-4 md:px-12 md:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-full text-lg md:text-xl font-bold hover:from-slate-700 hover:to-slate-800 transition-all duration-300 hover:scale-105 active:scale-95 shadow-xl shadow-slate-900/20 w-full max-w-sm shrink-0"
+                                >
+                                    TERUSKAN <i className="fa-solid fa-arrow-right ml-2"></i>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const FinalChallenge = ({ question, onComplete }) => {
+            const [timeLeft, setTimeLeft] = useState(10);
+            const [selected, setSelected] = useState(null);
+            const [showResult, setShowResult] = useState(false);
+
+            useEffect(() => {
+                if (timeLeft > 0 && !showResult) {
+                    const timer = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
+                    return () => clearTimeout(timer);
+                } else if (timeLeft === 0 && !showResult) {
+                    setShowResult(true); 
+                }
+            }, [timeLeft, showResult]);
+
+            const handleSelect = (index) => {
+                if (showResult) return;
+                setSelected(index);
+                setShowResult(true);
+            };
+
+            const isCorrect = selected === question.correctAnswer;
+            const isTimeout = timeLeft === 0 && selected === null;
+
+            return (
+                <div className={`w-full max-w-4xl mx-auto flex flex-col bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border-4 transition-colors duration-500 my-auto shrink-0 max-h-[85vh] ${timeLeft <= 3 && !showResult ? 'border-red-500 shadow-red-500/50' : 'border-slate-700'}`}>
+                    <div className="p-6 md:p-8 text-center relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900 shrink-0">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500"></div>
+                        <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-red-500/20 text-red-400 font-bold text-xs md:text-sm tracking-widest mb-4 border border-red-500/30">
+                            <i className="fa-solid fa-bolt"></i> CABARAN AKHIR 10-SAAT (PUSINGAN 5)
+                        </div>
+                        
+                        {!showResult && (
+                            <div className={`text-5xl md:text-7xl font-black mb-4 tabular-nums transition-colors duration-300 drop-shadow-lg ${timeLeft <= 3 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                                00:{timeLeft.toString().padStart(2, '0')}
+                            </div>
+                        )}
+
+                        <div className="text-lg md:text-2xl font-medium text-slate-200 px-4 md:px-8 leading-snug break-words">
+                            "{question.question}"
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 p-6 md:p-8 flex flex-col overflow-y-auto custom-scrollbar bg-slate-900/50 backdrop-blur-md">
+                        {!showResult ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full my-auto">
+                                {question.options.map((opt, i) => (
+                                    <button 
+                                        key={i}
+                                        onClick={() => handleSelect(i)}
+                                        className="p-4 md:p-6 text-left rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 hover:border-slate-500 text-white transition-all duration-200 group flex items-center h-full min-h-[100px]"
+                                    >
+                                        <span className="w-10 h-10 rounded-full bg-slate-700 group-hover:bg-white group-hover:text-slate-900 flex items-center justify-center font-bold mr-4 shrink-0 transition-colors">
+                                            {String.fromCharCode(65 + i)}
+                                        </span>
+                                        <span className="font-medium text-sm md:text-base leading-relaxed break-words">{opt}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-4 animate-[float_0.3s_ease-out_forwards]">
+                                <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center mb-6 shadow-2xl shrink-0 ${isCorrect && !isTimeout ? 'bg-gradient-to-br from-green-400 to-emerald-600' : 'bg-gradient-to-br from-red-500 to-rose-700'}`}>
+                                    <i className={`fa-solid ${isCorrect && !isTimeout ? 'fa-check' : (isTimeout ? 'fa-clock' : 'fa-xmark')} text-5xl md:text-6xl text-white drop-shadow-md`}></i>
+                                </div>
+                                <h2 className={`text-3xl md:text-4xl font-black mb-4 tracking-tight ${isCorrect && !isTimeout ? 'text-emerald-400 text-gradient from-green-400 to-emerald-200' : 'text-rose-500 text-gradient from-red-500 to-rose-300'}`}>
+                                    {isTimeout ? 'MASA TAMAT!' : (isCorrect ? 'TEPAT SEKALI!' : 'KURANG TEPAT')}
+                                </h2>
+                                
+                                {(!isCorrect || isTimeout) && (
+                                    <div className="bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-700 mb-6 w-full max-w-2xl shrink-0">
+                                        <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Jawapan Sebenar:</p>
+                                        <p className="font-semibold text-white md:text-lg break-words">{question.options[question.correctAnswer]}</p>
+                                    </div>
+                                )}
+                                
+                                <div className="bg-slate-800/80 p-5 rounded-2xl border border-slate-700 max-w-2xl w-full shrink-0">
+                                    <p className="text-slate-300 md:text-lg leading-relaxed break-words"><i className="fa-solid fa-lightbulb text-amber-400 mr-2"></i> {question.explanation}</p>
+                                </div>
+
+                                <button 
+                                    onClick={() => onComplete(isCorrect && !isTimeout)}
+                                    className="mt-8 px-10 py-4 md:px-12 md:py-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full text-lg md:text-xl font-bold hover:from-blue-500 hover:to-indigo-500 transition-all duration-300 hover:scale-105 active:scale-95 shadow-xl shadow-blue-900/50 w-full max-w-sm border border-blue-400/50 shrink-0"
+                                >
+                                    LIHAT KEPUTUSAN <i className="fa-solid fa-medal ml-2"></i>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const { db, getQuestion } = useDatabase();
+            
+            // phases: home -> spin1 -> q1 -> spin2 -> q2 -> spin3 -> q3 -> spin4 -> q4 -> spin5 -> final -> result
+            const [phase, setPhase] = useState('home');
+            const [score, setScore] = useState(0);
+            
+            const [cats, setCats] = useState([]); // [cat1, cat2, cat3, cat4, cat5]
+            const [qs, setQs] = useState([]);     // [q1, q2, q3, q4, qfinal]
+            const [selectedCategory, setSelectedCategory] = useState(null);
+            const [errorMsg, setErrorMsg] = useState(null); // Ganti window.alert()
+            
+            const resetGame = () => {
+                setPhase('home');
+                setScore(0);
+                setCats([]);
+                setQs([]);
+                setSelectedCategory(null);
+                setErrorMsg(null);
+            };
+
+            const handleSpinComplete = (category) => {
+                setSelectedCategory(category);
+                
+                setTimeout(() => {
+                    const currentRound = phase.replace('spin', ''); 
+                    const roundNum = parseInt(currentRound);
+                    
+                    const previousQIds = qs.map(q => q?.id);
+                    const q = getQuestion(category.id, previousQIds);
+                    
+                    if (q) {
+                        setCats(prev => [...prev, category]);
+                        setQs(prev => [...prev, q]);
+                        
+                        if (roundNum <= 4) {
+                            setPhase(`q${roundNum}`);
+                        } else if (roundNum === 5) {
+                            setPhase('final');
+                        }
+                    } else {
+                        // Ganti fungsi alert() kepada pesanan UI yang kemas
+                        setErrorMsg('Semua soalan untuk kategori ini telah dijawab. Sila putar sekali lagi.');
+                        setSelectedCategory(null);
+                        setTimeout(() => setErrorMsg(null), 3500);
+                    }
+                }, 2000); 
+            };
+
+            const handleQuestionComplete = (isCorrect, nextPhase) => {
+                if (isCorrect) setScore(prev => prev + 1);
+                setSelectedCategory(null);
+                setPhase(nextPhase);
+            };
+
+            const renderPhase = () => {
+                switch(phase) {
+                    case 'home':
+                        return (
+                            <div className="flex flex-col items-center justify-center h-full max-w-4xl mx-auto text-center px-4 shrink-0 mt-8 mb-8 my-auto w-full">
+                                <div className="bg-white/80 backdrop-blur-xl p-8 md:p-12 rounded-[3rem] shadow-2xl border border-white/60 w-full animate-[float_0.5s_ease-out_forwards]">
+                                    <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-blue-100 text-blue-800 font-bold text-sm tracking-widest mb-8 border border-blue-200">
+                                        <i className="fa-solid fa-gamepad"></i> BOOTH INTERAKTIF
+                                    </div>
+                                    <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-slate-800 mb-4 tracking-tighter leading-none break-words">
+                                        SAFETY<br/>
+                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600">WHEEL</span>
+                                    </h1>
+                                    <p className="text-lg md:text-2xl font-bold tracking-widest text-slate-400 mb-8 uppercase">
+                                        SPIN &bull; THINK &bull; ACT
+                                    </p>
+                                    <p className="text-base md:text-xl text-slate-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+                                        Uji pengetahuan keselamatan OSH anda dalam 5 pusingan, lengkapkan Cabaran Akhir 10-saat, dan dapatkan cop passport digital!
+                                    </p>
+                                    
+                                    <div className="grid grid-cols-4 md:grid-cols-8 gap-3 md:gap-4 mb-12 opacity-80 justify-center">
+                                        {CATEGORIES.map(c => (
+                                            <div key={c.id} className="flex flex-col items-center gap-2 group">
+                                                <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-white shadow-md transition-transform group-hover:scale-110" style={{backgroundColor: c.color}}>
+                                                    <i className={`fa-solid ${c.icon} text-xl md:text-2xl`}></i>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row gap-6 w-full max-w-md mx-auto">
+                                        <button onClick={() => setPhase('spin1')} className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 md:py-5 px-8 rounded-full text-lg md:text-2xl font-black hover:from-green-400 hover:to-emerald-500 transition-all duration-300 hover:scale-[1.03] active:scale-95 shadow-[0_10px_20px_rgba(16,185,129,0.4)] border-b-4 border-emerald-700">
+                                            MULA SEKARANG
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+
+                    case 'spin1':
+                    case 'spin2':
+                    case 'spin3':
+                    case 'spin4':
+                    case 'spin5':
+                        const roundNumber = phase.replace('spin', '');
+                        const isFinalRound = phase === 'spin5';
+                        
+                        return (
+                            <div className="flex flex-col items-center justify-center h-full w-full max-w-2xl mx-auto text-center px-4 animate-[float_0.3s_ease-out_forwards] my-auto py-8 shrink-0">
+                                <h2 className="text-sm md:text-base font-bold text-slate-500 tracking-widest uppercase mb-2">Pusingan {roundNumber} / 5</h2>
+                                <h1 className="text-3xl md:text-5xl font-black mb-6 md:mb-10 text-slate-800">
+                                    {isFinalRound ? <span className="text-red-500">CABARAN AKHIR</span> : 'PUTAR RODA'}
+                                </h1>
+                                
+                                {errorMsg && (
+                                    <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative animate-[float_0.3s_ease-out_forwards] w-full max-w-sm" role="alert">
+                                        <span className="block sm:inline text-sm font-bold">{errorMsg}</span>
+                                    </div>
+                                )}
+                                
+                                <div className="mt-4 md:mt-8 mb-12 md:mb-16">
+                                    <Wheel categories={CATEGORIES} onSpinComplete={handleSpinComplete} />
+                                </div>
+
+                                {selectedCategory && (
+                                    <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl shadow-xl border border-slate-100 animate-[float_0.3s_ease-out_forwards] w-full max-w-md mt-4">
+                                        <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Kategori Pilihan</p>
+                                        <h3 className="text-xl md:text-3xl font-black break-words" style={{color: selectedCategory.color}}>
+                                            <i className={`fa-solid ${selectedCategory.icon} mr-3`}></i>{selectedCategory.name}
+                                        </h3>
+                                    </div>
+                                )}
+                            </div>
+                        );
+
+                    case 'q1': return <div className="flex flex-col h-full py-6 px-4 md:px-8 w-full justify-center z-10"><QuestionView roundNum={1} question={qs[0]} category={cats[0]} onComplete={(res) => handleQuestionComplete(res, 'spin2')} /></div>;
+                    case 'q2': return <div className="flex flex-col h-full py-6 px-4 md:px-8 w-full justify-center z-10"><QuestionView roundNum={2} question={qs[1]} category={cats[1]} onComplete={(res) => handleQuestionComplete(res, 'spin3')} /></div>;
+                    case 'q3': return <div className="flex flex-col h-full py-6 px-4 md:px-8 w-full justify-center z-10"><QuestionView roundNum={3} question={qs[2]} category={cats[2]} onComplete={(res) => handleQuestionComplete(res, 'spin4')} /></div>;
+                    case 'q4': return <div className="flex flex-col h-full py-6 px-4 md:px-8 w-full justify-center z-10"><QuestionView roundNum={4} question={qs[3]} category={cats[3]} onComplete={(res) => handleQuestionComplete(res, 'spin5')} /></div>;
+                    case 'final': return <div className="flex flex-col h-full py-6 px-4 md:px-8 w-full justify-center z-10"><FinalChallenge question={qs[4]} onComplete={(res) => handleQuestionComplete(res, 'result')} /></div>;
+
+                    case 'result':
+                        let message = "";
+                        let title = "";
+                        if (score === 5) { title = "SAFETY CHAMPION"; message = "Hebat! Anda juara keselamatan!"; }
+                        else if (score >= 3) { title = "SAFETY SMART"; message = "Bagus! Teruskan usaha yang cemerlang!"; }
+                        else if (score >= 1) { title = "KEEP LEARNING"; message = "Terus belajar! Keselamatan bermula dari kita."; }
+                        else { title = "SAFETY STARTER"; message = "Jangan risau. Cuba lagi dan tingkatkan pengetahuan keselamatan anda!"; }
+
+                        return (
+                            <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto text-center px-4 w-full py-8 my-auto shrink-0">
+                                <div className="bg-white/90 backdrop-blur-xl p-8 md:p-12 rounded-[3rem] shadow-2xl border border-white/50 w-full animate-[float_0.5s_ease-out_forwards]">
+                                    <h1 className="text-3xl md:text-5xl font-black text-slate-800 mb-2 tracking-tight">TAHNIAH!</h1>
+                                    <p className="text-base md:text-xl text-slate-500 font-medium mb-10">Anda telah melengkapkan ESH Safety Wheel</p>
+                                    
+                                    <div className="flex justify-center mb-10">
+                                        <div className="bg-gradient-to-b from-slate-50 to-slate-100 rounded-[2.5rem] p-6 md:p-10 shadow-inner border-2 border-slate-200/60 relative w-full max-w-sm">
+                                            <div className="absolute -top-4 md:-top-5 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-6 py-1.5 rounded-full text-xs md:text-sm font-bold tracking-widest shadow-lg">
+                                                SKOR KESELURUHAN
+                                            </div>
+                                            <div className="text-6xl md:text-8xl font-black text-slate-800 mb-2 tabular-nums tracking-tighter">
+                                                {score}<span className="text-4xl md:text-5xl text-slate-300">/5</span>
+                                            </div>
+                                            <div className={`text-lg md:text-2xl font-black uppercase tracking-widest mt-4 ${score === 5 ? 'text-emerald-500' : 'text-blue-500'}`}>
+                                                {title}
+                                            </div>
+                                            <p className="text-slate-500 mt-3 text-sm md:text-lg">{message}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Markah > 0 layak mendapat cop passport */}
+                                    {score >= 1 && (
+                                        <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-green-200 p-6 md:p-8 rounded-3xl mb-10 relative overflow-hidden group hover:border-green-300 transition-colors w-full max-w-md mx-auto">
+                                            <div className="absolute -right-10 -bottom-10 opacity-10 transform -rotate-12 group-hover:scale-110 transition-transform">
+                                                <i className="fa-solid fa-stamp text-[100px] md:text-[150px] text-green-600"></i>
+                                            </div>
+                                            <div className="relative z-10 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 text-center md:text-left">
+                                                <div className="w-16 h-16 md:w-20 md:h-20 bg-green-500 text-white rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-lg shrink-0">
+                                                    <i className="fa-solid fa-check"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg md:text-2xl font-black text-green-800 mb-1 leading-tight">ESH PASSPORT COP</h3>
+                                                    <p className="text-green-600 font-medium text-sm md:text-lg">Telah Diperolehi Sah!</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <button 
+                                        onClick={resetGame}
+                                        className="px-10 md:px-12 py-4 md:py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-full text-lg md:text-xl font-bold hover:from-slate-700 hover:to-slate-800 transition-all duration-300 hover:scale-[1.03] active:scale-95 shadow-xl shadow-slate-900/20 w-full max-w-sm"
+                                    >
+                                        SELESAI & MAIN LAGI
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                }
+            };
+
+            return (
+                <div className="h-full flex flex-col relative w-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-50 via-slate-50 to-white">
+                    {}
+                    <div className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 bg-blue-400/5 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="absolute bottom-0 left-0 w-64 h-64 md:w-[30rem] md:h-[30rem] bg-indigo-400/5 rounded-full blur-3xl pointer-events-none"></div>
+
+                    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 p-4 md:p-5 flex justify-center items-center z-20 shrink-0 shadow-sm relative">
+                        <div className="flex flex-col items-center justify-center text-center max-w-[80%] mx-auto">
+                            <span className="font-black tracking-widest text-slate-800 text-[11px] sm:text-sm md:text-xl leading-tight uppercase break-words mb-1 flex items-center justify-center">
+                                <i className="fa-solid fa-shield-heart text-blue-600 mr-2 text-sm md:text-2xl drop-shadow-sm"></i>
+                                OSH Day Hospital Sri Aman 2026
+                            </span>
+                            <span className="font-bold tracking-wider text-blue-600 text-[9px] sm:text-xs md:text-sm uppercase break-words">
+                                Peringkat Kluster Sarawak Tenggara
+                            </span>
+                        </div>
+                        
+                        {phase !== 'home' && (
+                            <div className="absolute right-4 md:right-5 top-1/2 -translate-y-1/2 font-mono text-sm flex items-center shrink-0">
+                                <button onClick={resetGame} className="text-slate-500 hover:text-slate-800 transition-colors font-bold tracking-wider text-[10px] md:text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-full flex items-center shadow-sm">
+                                    <i className="fa-solid fa-rotate-left md:mr-2"></i> <span className="hidden md:inline">RESET</span>
+                                </button>
+                            </div>
+                        )}
+                    </header>
+                    
+                    <main className="flex-1 relative overflow-y-auto overflow-x-hidden w-full flex flex-col custom-scrollbar">
+                        {renderPhase()}
+                    </main>
+
+                    <footer className="bg-slate-900 text-slate-400 p-4 md:p-6 text-center shrink-0 z-20 shadow-2xl relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+                        <div className="relative z-10 flex flex-col md:flex-row justify-center items-center gap-1 md:gap-6">
+                            <span className="font-bold tracking-widest text-[9px] md:text-sm text-slate-300">KESELAMATAN ADALAH TANGGUNGJAWAB BERSAMA</span>
+                            <span className="hidden md:inline text-slate-600">•</span>
+                            <span className="tracking-widest text-[8px] md:text-xs">BERFIKIR &bull; BERTINDAK &bull; BERKOMUNIKASI</span>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
